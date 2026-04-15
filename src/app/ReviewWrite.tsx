@@ -13,6 +13,12 @@ const mockProducts = [
   { id: 3, brand: '에스쁘아', name: '쿠션 파운데이션 [21호]', image: productPlaceholder },
   { id: 4, brand: '헤라', name: '블랙 쿠션 [23호]', image: productPlaceholder },
   { id: 5, brand: '설화수', name: '자음 에센스 [기본형]', image: productPlaceholder },
+  { id: 6, brand: '토리든', name: '다이브인 로우 분자 히알루론산 세럼', image: productPlaceholder },
+  { id: 7, brand: '토리든', name: '다이브인 로우 분자 히알루론산 토너', image: productPlaceholder },
+  { id: 8, brand: '토리든', name: '다이브인 로우 분자 히알루론산 로션', image: productPlaceholder },
+  { id: 9, brand: '이니스프리', name: '그린티 히알루론산 로션', image: productPlaceholder },
+  { id: 10, brand: '아벤느', name: '하이드란스 옵티말 리치 크림 로션', image: productPlaceholder },
+  { id: 11, brand: '닥터지', name: '레드 블레미쉬 클리어 수딩 크림', image: productPlaceholder },
 ];
 
 interface Product {
@@ -58,18 +64,21 @@ export default function ReviewWrite() {
   const [prosText, setProsText] = useState('');
   const [prosTextCompleted, setProsTextCompleted] = useState(false);
   const [prosExpanded, setProsExpanded] = useState(true);
+  const [prosNoSelectionError, setProsNoSelectionError] = useState(false);
 
   // Step 6: Cons
   const [selectedCons, setSelectedCons] = useState<string[]>([]);
   const [consText, setConsText] = useState('');
   const [consTextCompleted, setConsTextCompleted] = useState(false);
   const [consExpanded, setConsExpanded] = useState(true);
+  const [consNoSelectionError, setConsNoSelectionError] = useState(false);
 
   // Step 7-9: Purchase Reason, Free Review, Repurchase (shown together)
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [reasonText, setReasonText] = useState('');
   const [reasonExpanded, setReasonExpanded] = useState(true);
   const [reasonCompleted, setReasonCompleted] = useState(false);
+  const [reasonNoSelectionError, setReasonNoSelectionError] = useState(false);
   const [freeReview, setFreeReview] = useState('');
   const [repurchaseIntent, setRepurchaseIntent] = useState('');
   const [repurchaseExpanded, setRepurchaseExpanded] = useState(true);
@@ -106,30 +115,45 @@ export default function ReviewWrite() {
     '다크서클', '잡티(기미,주근깨)', '모공/홈터', '유분', '블랙헤드/피지',
   ];
 
-  // Auto-scroll when new sections appear
+  // Auto-scroll: 새 섹션이 처음 나타날 때만 부드럽게 스크롤
+  const scrollToIfNeeded = (ref: React.RefObject<HTMLDivElement | null>, delay = 300) => {
+    setTimeout(() => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const isOffscreen = rect.bottom > window.innerHeight || rect.top < 0;
+      if (isOffscreen) {
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, delay);
+  };
+
   useEffect(() => {
-    if (selectedProduct && rating > 0) {
-      setTimeout(() => {
-        photoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 200);
-    }
+    if (selectedProduct && rating > 0) scrollToIfNeeded(photoRef);
   }, [rating]);
 
   useEffect(() => {
     if (photos.length >= 2) {
       setTimeout(() => {
         usagePeriodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 200);
+      }, 300);
     }
   }, [photos.length]);
 
   useEffect(() => {
-    if (usagePeriod) {
-      setTimeout(() => {
-        prosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 200);
-    }
+    if (usagePeriod) scrollToIfNeeded(prosRef);
   }, [usagePeriod]);
+
+  useEffect(() => {
+    // pros 완료 시 cons는 pros가 collapse되며 자연스럽게 그 자리에 나타나므로 scroll 불필요
+  }, [prosTextCompleted]);
+
+  useEffect(() => {
+    if (consTextCompleted) setReasonExpanded(true);
+  }, [consTextCompleted]);
+
+  useEffect(() => {
+    if (repurchaseIntent) scrollToIfNeeded(skinInfoRef, 400);
+  }, [repurchaseIntent]);
 
 
   // Filter products based on search query
@@ -225,10 +249,6 @@ export default function ReviewWrite() {
     setUsagePeriod(period);
     setUsagePeriodExpanded(false);
     if (completedSteps < 4) setCompletedSteps(4);
-    // 좋았던 점으로 스크롤
-    setTimeout(() => {
-      prosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 300);
   };
 
   const handleProsToggle = (option: string) => {
@@ -237,22 +257,19 @@ export default function ReviewWrite() {
     } else {
       const next = [...selectedPros, option];
       setSelectedPros(next);
-      if (next.length === 1) {
-        setTimeout(() => {
-          prosTextareaRef.current?.focus();
-          prosTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
-      }
+      if (next.length > 0) setProsNoSelectionError(false);
     }
   };
 
   const handleProsTextBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    if (e.target.value.trim().length > 0 && selectedPros.length === 0) {
+      setProsNoSelectionError(true);
+      return;
+    }
     if (selectedPros.length > 0 && e.target.value.trim().length >= 70) {
       setProsTextCompleted(true);
+      setProsExpanded(false);
       if (completedSteps < 5) setCompletedSteps(5);
-      setTimeout(() => {
-        consRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 300);
     }
   };
 
@@ -262,22 +279,19 @@ export default function ReviewWrite() {
     } else {
       const next = [...selectedCons, option];
       setSelectedCons(next);
-      if (next.length === 1) {
-        setTimeout(() => {
-          consTextareaRef.current?.focus();
-          consTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
-      }
+      if (next.length > 0) setConsNoSelectionError(false);
     }
   };
 
   const handleConsTextBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    if (selectedCons.length > 0 && e.target.value.trim().length >= 20) {
+    if (e.target.value.trim().length > 0 && selectedCons.length === 0) {
+      setConsNoSelectionError(true);
+      return;
+    }
+    if (selectedCons.length > 0 && e.target.value.trim().length >= 70) {
       setConsTextCompleted(true);
+      setConsExpanded(false);
       if (completedSteps < 6) setCompletedSteps(6);
-      setTimeout(() => {
-        reasonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 300);
     }
   };
 
@@ -288,12 +302,7 @@ export default function ReviewWrite() {
       const next = [...selectedReasons, option];
       setSelectedReasons(next);
       if (completedSteps < 6) setCompletedSteps(6);
-      if (next.length === 1) {
-        setTimeout(() => {
-          reasonTextareaRef.current?.focus();
-          reasonTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
-      }
+      if (next.length > 0) setReasonNoSelectionError(false);
     }
   };
 
@@ -301,15 +310,6 @@ export default function ReviewWrite() {
     setRepurchaseIntent(option);
     setRepurchaseExpanded(false);
     if (completedSteps < 7) setCompletedSteps(7);
-    setTimeout(() => {
-      if (skinInfoRef.current) {
-        const rect = skinInfoRef.current.getBoundingClientRect();
-        const isCompletelyHidden = rect.top >= window.innerHeight || rect.bottom <= 0;
-        if (isCompletelyHidden) {
-          skinInfoRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }
-    }, 300);
   };
 
   const handleSkinConcernToggle = (concern: string) => {
@@ -334,15 +334,15 @@ export default function ReviewWrite() {
     (selectedPros.length > 0 ? 20 : 0) +
     (prosText.trim().length >= 70 ? 80 : 0) +
     (selectedCons.length > 0 ? 20 : 0) +
-    (consText.trim().length >= 20 ? 50 : 0) +
+    (consText.trim().length >= 70 ? 50 : 0) +
     (selectedReasons.length > 0 ? 20 : 0) +
-    (reasonText.trim().length >= 70 ? 80 : 0) +
+    (reasonText.trim().length >= 20 ? 80 : 0) +
     (repurchaseIntent ? 50 : 0);
   const progress = (coinCount / 500) * 100;
   const canSubmit = !!(selectedProduct && rating > 0 && photos.length >= 2 && selectedPros.length > 0 && prosText.trim());
 
   return (
-    <div className="bg-white relative w-full min-h-screen max-w-[360px] mx-auto overflow-y-auto">
+    <motion.div layoutScroll className="bg-white relative w-full min-h-screen max-w-[360px] mx-auto overflow-y-auto" style={{ overflowAnchor: 'none' }}>
       {/* Status bar */}
       <div className="fixed bg-white h-[24px] left-1/2 -translate-x-1/2 top-0 w-full max-w-[360px] z-50">
         <StatusBar />
@@ -659,7 +659,12 @@ export default function ReviewWrite() {
               question="사용하면서 좋았던 점은 무엇인가요?"
               expanded={prosExpanded}
               selectedSummary={formatTags(selectedPros)}
-              onToggle={() => prosTextCompleted || selectedPros.length > 0 ? setProsExpanded(v => !v) : undefined}
+              onToggle={() => {
+                if (!(prosTextCompleted || selectedPros.length > 0)) return;
+                const next = !prosExpanded;
+                setProsExpanded(next);
+                if (next) { setConsExpanded(false); setReasonExpanded(false); }
+              }}
               canCollapse={selectedPros.length > 0}
             >
               <div className="flex flex-wrap gap-[8px] justify-center">
@@ -667,57 +672,51 @@ export default function ReviewWrite() {
                   <button
                     key={option}
                     onClick={() => handleProsToggle(option)}
-                    className={`px-[12px] py-[7px] rounded-[22px] border transition-colors font-['Pretendard'] text-[13px] leading-[18px] ${
+                    className={`relative px-[12px] py-[7px] rounded-[22px] border transition-colors font-['Pretendard'] text-[13px] leading-[18px] ${
                       selectedPros.includes(option)
-                        ? 'bg-[#fff2ee] border-[#FF5542] text-[#FF5542] font-bold'
-                        : 'bg-white border-[#ddd] text-[#555] font-medium'
+                        ? 'bg-[#fff2ee] border-[#FF5542] text-[#FF5542]'
+                        : 'bg-white border-[#ddd] text-[#555]'
                     }`}
                   >
-                    {option}
+                    <span className="font-bold invisible" aria-hidden="true">{option}</span>
+                    <span className={`absolute inset-0 flex items-center justify-center ${selectedPros.includes(option) ? 'font-bold' : 'font-medium'}`}>{option}</span>
                   </button>
                 ))}
               </div>
-              <AnimatePresence>
-                {selectedPros.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-[16px] mb-[16px] h-px bg-[#ececec]" />
-                    <p className="font-['Pretendard'] font-bold text-[15px] leading-[22px] text-[#555] mb-[12px] text-center">
-                      어떤 상황에서 사용했고, 어떤 점이 좋았나요?
-                    </p>
-                    <textarea
-                      ref={prosTextareaRef}
-                      placeholder="아침 / 화장 전 / 외출 후 등 상황과 느낌을 함께 적어주세요"
-                      value={prosText}
-                      onChange={(e) => {
-                        setProsText(e.target.value);
-                        if (selectedPros.length > 0 && e.target.value.trim().length >= 70 && !prosTextCompleted) {
-                          setProsTextCompleted(true);
-                          if (completedSteps < 5) setCompletedSteps(5);
-                          setTimeout(() => { consRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 300);
-                        }
-                      }}
-                      onBlur={(e) => handleProsTextBlur(e)}
-                      className="w-full bg-white rounded-[8px] border border-[#ececec] px-[12px] py-[12px] font-['Pretendard'] text-[15px] leading-[22px] text-[#333] outline-none placeholder:text-[#999] focus:border-[#333] transition-colors min-h-[68px] resize-none"
-                    />
-                    {prosText.length >= 70 ? (
-                      <p className="flex items-center gap-[4px] font-['Pretendard'] text-[13px] mt-[4px] text-[#35B275]">
-                        <CheckCircle2 className="size-[14px] shrink-0" />
-                        최소 글자 수를 충족했어요
-                      </p>
-                    ) : (
-                      <p className="font-['Pretendard'] text-[13px] mt-[4px] text-[#999]">
-                        자세히 적어주시면 도움이 돼요 <span className="text-[#ff5527]">({prosText.length}/70)</span>
-                      </p>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {prosNoSelectionError && selectedPros.length === 0 && (
+                <p className="font-['Pretendard'] text-[13px] mt-[6px] text-[#ff5527] text-left">
+                  목록을 하나 이상 선택해주세요
+                </p>
+              )}
+              <div className="mt-[16px] mb-[16px] h-px bg-[#ececec]" />
+              <p className="font-['Pretendard'] font-bold text-[15px] leading-[22px] text-[#555] mb-[12px] text-center">
+                어떤 상황에서 사용했고, 어떤 점이 좋았나요?
+              </p>
+              <textarea
+                ref={prosTextareaRef}
+                placeholder="아침 / 화장 전 / 외출 후 등 상황과 느낌을 함께 적어주세요"
+                value={prosText}
+                onChange={(e) => {
+                  setProsText(e.target.value);
+                  if (e.target.value.trim().length > 0) setProsNoSelectionError(false);
+                  if (selectedPros.length > 0 && e.target.value.trim().length >= 70 && !prosTextCompleted) {
+                    setProsTextCompleted(true);
+                    if (completedSteps < 5) setCompletedSteps(5);
+                  }
+                }}
+                onBlur={(e) => handleProsTextBlur(e)}
+                className="w-full bg-white rounded-[8px] border border-[#ececec] px-[12px] py-[12px] font-['Pretendard'] text-[15px] leading-[22px] text-[#333] outline-none placeholder:text-[#999] focus:border-[#333] transition-colors min-h-[68px] resize-none"
+              />
+              {prosText.length >= 70 ? (
+                <p className="flex items-center gap-[4px] font-['Pretendard'] text-[13px] mt-[4px] text-[#35B275]">
+                  <CheckCircle2 className="size-[14px] shrink-0" />
+                  최소 글자 수를 충족했어요
+                </p>
+              ) : (
+                <p className="font-['Pretendard'] text-[13px] mt-[4px] text-[#999]">
+                  자세히 적어주시면 도움이 돼요 <span className="text-[#ff5527]">({prosText.length}/70)</span>
+                </p>
+              )}
             </CollapsibleCard>
           </motion.div>
         )}
@@ -735,7 +734,12 @@ export default function ReviewWrite() {
               question="사용하면서 아쉬웠던 점은 무엇인가요?"
               expanded={consExpanded}
               selectedSummary={formatTags(selectedCons)}
-              onToggle={() => selectedCons.length > 0 ? setConsExpanded(v => !v) : undefined}
+              onToggle={() => {
+                if (!selectedCons.length) return;
+                const next = !consExpanded;
+                setConsExpanded(next);
+                if (next) { setProsExpanded(false); setReasonExpanded(false); }
+              }}
               canCollapse={selectedCons.length > 0}
             >
               <div className="flex flex-wrap gap-[8px] justify-center">
@@ -743,57 +747,51 @@ export default function ReviewWrite() {
                   <button
                     key={option}
                     onClick={() => handleConsToggle(option)}
-                    className={`px-[12px] py-[7px] rounded-[22px] border transition-colors font-['Pretendard'] text-[13px] leading-[18px] ${
+                    className={`relative px-[12px] py-[7px] rounded-[22px] border transition-colors font-['Pretendard'] text-[13px] leading-[18px] ${
                       selectedCons.includes(option)
-                        ? 'bg-[#fff2ee] border-[#FF5542] text-[#FF5542] font-bold'
-                        : 'bg-white border-[#ddd] text-[#555] font-medium'
+                        ? 'bg-[#fff2ee] border-[#FF5542] text-[#FF5542]'
+                        : 'bg-white border-[#ddd] text-[#555]'
                     }`}
                   >
-                    {option}
+                    <span className="font-bold invisible" aria-hidden="true">{option}</span>
+                    <span className={`absolute inset-0 flex items-center justify-center ${selectedCons.includes(option) ? 'font-bold' : 'font-medium'}`}>{option}</span>
                   </button>
                 ))}
               </div>
-              <AnimatePresence>
-                {selectedCons.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-[16px] mb-[16px] h-px bg-[#ececec]" />
-                    <p className="font-['Pretendard'] font-bold text-[15px] leading-[22px] text-[#555] mb-[12px] text-center">
-                      어떤 상황에서 불편했고, 어떤 점이 아쉬웠나요?
-                    </p>
-                    <textarea
-                      ref={consTextareaRef}
-                      placeholder="사용 중 불편했던 순간이나 개선됐으면 하는 점을 적어주세요"
-                      value={consText}
-                      onChange={(e) => {
-                        setConsText(e.target.value);
-                        if (selectedCons.length > 0 && e.target.value.trim().length >= 20 && !consTextCompleted) {
-                          setConsTextCompleted(true);
-                          if (completedSteps < 6) setCompletedSteps(6);
-                          setTimeout(() => { reasonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 300);
-                        }
-                      }}
-                      onBlur={(e) => handleConsTextBlur(e)}
-                      className="w-full bg-white rounded-[8px] border border-[#ececec] px-[12px] py-[12px] font-['Pretendard'] text-[15px] leading-[22px] text-[#333] outline-none placeholder:text-[#999] focus:border-[#333] transition-colors min-h-[68px] resize-none"
-                    />
-                    {consText.length >= 20 ? (
-                      <p className="flex items-center gap-[4px] font-['Pretendard'] text-[13px] mt-[4px] text-[#35B275]">
-                        <CheckCircle2 className="size-[14px] shrink-0" />
-                        최소 글자 수를 충족했어요
-                      </p>
-                    ) : (
-                      <p className="font-['Pretendard'] text-[13px] mt-[4px] text-[#999]">
-                        자세히 적어주시면 도움이 돼요 <span className="text-[#ff5527]">({consText.length}/20)</span>
-                      </p>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {consNoSelectionError && selectedCons.length === 0 && (
+                <p className="font-['Pretendard'] text-[13px] mt-[6px] text-[#ff5527] text-left">
+                  목록을 하나 이상 선택해주세요
+                </p>
+              )}
+              <div className="mt-[16px] mb-[16px] h-px bg-[#ececec]" />
+              <p className="font-['Pretendard'] font-bold text-[15px] leading-[22px] text-[#555] mb-[12px] text-center">
+                어떤 상황에서 불편했고, 어떤 점이 아쉬웠나요?
+              </p>
+              <textarea
+                ref={consTextareaRef}
+                placeholder="사용 중 불편했던 순간이나 개선됐으면 하는 점을 적어주세요"
+                value={consText}
+                onChange={(e) => {
+                  setConsText(e.target.value);
+                  if (e.target.value.trim().length > 0) setConsNoSelectionError(false);
+                  if (selectedCons.length > 0 && e.target.value.trim().length >= 70 && !consTextCompleted) {
+                    setConsTextCompleted(true);
+                    if (completedSteps < 6) setCompletedSteps(6);
+                  }
+                }}
+                onBlur={(e) => handleConsTextBlur(e)}
+                className="w-full bg-white rounded-[8px] border border-[#ececec] px-[12px] py-[12px] font-['Pretendard'] text-[15px] leading-[22px] text-[#333] outline-none placeholder:text-[#999] focus:border-[#333] transition-colors min-h-[68px] resize-none"
+              />
+              {consText.length >= 70 ? (
+                <p className="flex items-center gap-[4px] font-['Pretendard'] text-[13px] mt-[4px] text-[#35B275]">
+                  <CheckCircle2 className="size-[14px] shrink-0" />
+                  최소 글자 수를 충족했어요
+                </p>
+              ) : (
+                <p className="font-['Pretendard'] text-[13px] mt-[4px] text-[#999]">
+                  자세히 적어주시면 도움이 돼요 <span className="text-[#ff5527]">({consText.length}/70)</span>
+                </p>
+              )}
             </CollapsibleCard>
           </motion.div>
         )}
@@ -811,7 +809,12 @@ export default function ReviewWrite() {
               question="이 제품의 사용 경로는 무엇인가요?"
               expanded={reasonExpanded}
               selectedSummary={formatTags(selectedReasons)}
-              onToggle={() => selectedReasons.length > 0 ? setReasonExpanded(v => !v) : undefined}
+              onToggle={() => {
+                if (!selectedReasons.length) return;
+                const next = !reasonExpanded;
+                setReasonExpanded(next);
+                if (next) { setProsExpanded(false); setConsExpanded(false); }
+              }}
               canCollapse={selectedReasons.length > 0}
             >
               <div className="flex flex-wrap gap-[8px] justify-center">
@@ -819,59 +822,59 @@ export default function ReviewWrite() {
                   <button
                     key={option}
                     onClick={() => handleReasonToggle(option)}
-                    className={`px-[12px] py-[7px] rounded-[22px] border transition-colors font-['Pretendard'] text-[13px] leading-[18px] ${
+                    className={`relative px-[12px] py-[7px] rounded-[22px] border transition-colors font-['Pretendard'] text-[13px] leading-[18px] ${
                       selectedReasons.includes(option)
-                        ? 'bg-[#fff2ee] border-[#FF5542] text-[#FF5542] font-bold'
-                        : 'bg-white border-[#ddd] text-[#555] font-medium'
+                        ? 'bg-[#fff2ee] border-[#FF5542] text-[#FF5542]'
+                        : 'bg-white border-[#ddd] text-[#555]'
                     }`}
                   >
-                    {option}
+                    <span className="font-bold invisible" aria-hidden="true">{option}</span>
+                    <span className={`absolute inset-0 flex items-center justify-center ${selectedReasons.includes(option) ? 'font-bold' : 'font-medium'}`}>{option}</span>
                   </button>
                 ))}
               </div>
-              <AnimatePresence>
-                {selectedReasons.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-[16px] mb-[16px] h-px bg-[#ececec]" />
-                    <p className="font-['Pretendard'] font-bold text-[15px] leading-[22px] text-[#555] mb-[12px] text-center">
-                      어떤 계기로 이 제품을 알게 됐나요?
-                    </p>
-                    <textarea
-                      ref={reasonTextareaRef}
-                      placeholder="추천받은 채널, 광고, 지인 등 구체적인 계기를 적어주세요"
-                      value={reasonText}
-                      onChange={(e) => {
-                        setReasonText(e.target.value);
-                        if (selectedReasons.length > 0 && e.target.value.trim().length >= 70 && !reasonCompleted) {
-                          setReasonCompleted(true);
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (selectedReasons.length > 0 && e.target.value.trim().length >= 70) {
-                          setReasonCompleted(true);
-                        }
-                      }}
-                      className="w-full bg-white rounded-[8px] border border-[#ececec] px-[12px] py-[12px] font-['Pretendard'] text-[15px] leading-[22px] text-[#333] outline-none placeholder:text-[#999] focus:border-[#333] transition-colors min-h-[68px] resize-none"
-                    />
-                    {reasonText.length >= 70 ? (
-                      <p className="flex items-center gap-[4px] font-['Pretendard'] text-[13px] mt-[4px] text-[#35B275]">
-                        <CheckCircle2 className="size-[14px] shrink-0" />
-                        최소 글자 수를 충족했어요
-                      </p>
-                    ) : (
-                      <p className="font-['Pretendard'] text-[13px] mt-[4px] text-[#999]">
-                        자세히 적어주시면 도움이 돼요 <span className="text-[#ff5527]">({reasonText.length}/70)</span>
-                      </p>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {reasonNoSelectionError && selectedReasons.length === 0 && (
+                <p className="font-['Pretendard'] text-[13px] mt-[6px] text-[#ff5527] text-left">
+                  목록을 하나 이상 선택해주세요
+                </p>
+              )}
+              <div className="mt-[16px] mb-[16px] h-px bg-[#ececec]" />
+              <p className="font-['Pretendard'] font-bold text-[15px] leading-[22px] text-[#555] mb-[12px] text-center">
+                어떤 계기로 이 제품을 알게 됐나요?
+              </p>
+              <textarea
+                ref={reasonTextareaRef}
+                placeholder="추천받은 채널, 광고, 지인 등 구체적인 계기를 적어주세요"
+                value={reasonText}
+                onChange={(e) => {
+                  setReasonText(e.target.value);
+                  if (e.target.value.trim().length > 0) setReasonNoSelectionError(false);
+                  if (selectedReasons.length > 0 && e.target.value.trim().length >= 20 && !reasonCompleted) {
+                    setReasonCompleted(true);
+                  }
+                }}
+                onBlur={(e) => {
+                  if (e.target.value.trim().length > 0 && selectedReasons.length === 0) {
+                    setReasonNoSelectionError(true);
+                    return;
+                  }
+                  if (selectedReasons.length > 0 && e.target.value.trim().length >= 20) {
+                    setReasonCompleted(true);
+                    setReasonExpanded(false);
+                  }
+                }}
+                className="w-full bg-white rounded-[8px] border border-[#ececec] px-[12px] py-[12px] font-['Pretendard'] text-[15px] leading-[22px] text-[#333] outline-none placeholder:text-[#999] focus:border-[#333] transition-colors min-h-[68px] resize-none"
+              />
+              {reasonText.length >= 20 ? (
+                <p className="flex items-center gap-[4px] font-['Pretendard'] text-[13px] mt-[4px] text-[#35B275]">
+                  <CheckCircle2 className="size-[14px] shrink-0" />
+                  최소 글자 수를 충족했어요
+                </p>
+              ) : (
+                <p className="font-['Pretendard'] text-[13px] mt-[4px] text-[#999]">
+                  자세히 적어주시면 도움이 돼요 <span className="text-[#ff5527]">({reasonText.length}/20)</span>
+                </p>
+              )}
             </CollapsibleCard>
           </motion.div>
         )}
@@ -892,7 +895,6 @@ export default function ReviewWrite() {
                 placeholder="자유롭게 리뷰를 작성해주세요"
                 value={freeReview}
                 onChange={(e) => setFreeReview(e.target.value)}
-                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200)}
                 className="w-full bg-white rounded-[8px] border border-[#e5e5e5] px-[12px] py-[12px] font-['Pretendard'] text-[14px] leading-[20px] text-[#333] outline-none placeholder:text-[#999] focus:border-[#333] transition-colors min-h-[100px] resize-none"
               />
               <p className="font-['Pretendard'] text-[12px] text-[#999] text-right -mt-[8px]">{freeReview.length}/300</p>
@@ -1115,7 +1117,7 @@ export default function ReviewWrite() {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1138,18 +1140,17 @@ function CollapsibleCard({
   children: React.ReactNode;
 }) {
   return (
-    <motion.div
-      layout
+    <div
       onClick={() => canCollapse && !expanded && onToggle()}
       className="relative rounded-[12px] overflow-hidden"
       style={{
         backgroundColor: expanded ? '#fafafa' : '#ffffff',
         boxShadow: !expanded && canCollapse ? 'inset 0 0 0 1px #e5e5e5' : 'none',
         cursor: !expanded && canCollapse ? 'pointer' : 'default',
+        overflowAnchor: 'none',
       }}
-      transition={{ layout: { type: 'spring', stiffness: 350, damping: 30 } }}
     >
-      <motion.div layout className="px-[16px] pt-[20px] pb-[16px] flex flex-col items-center gap-[8px]">
+      <div className="px-[16px] pt-[20px] pb-[16px] flex flex-col items-center gap-[8px]">
         <p className="font-['Pretendard'] font-bold text-[15px] leading-[22px] text-[#555] text-center w-full">
           {question}
         </p>
@@ -1196,8 +1197,8 @@ function CollapsibleCard({
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 

@@ -6,4 +6,4 @@ export const router = createBrowserRouter([
     path: "/",
     Component: ReviewWrite,
   },
-]);
+], { basename: "/review-write" });
